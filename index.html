@@ -136,7 +136,7 @@
   .note b{color:var(--warn)}
 
   canvas{width:100%;display:block;background:var(--panel2);border-radius:9px;
-    border:1px solid var(--line);margin-top:12px}
+    border:1px solid var(--line);margin-top:10px}
 
   pre{margin:10px 0 0;font-family:var(--mono);font-size:11.5px;color:var(--dim);
     max-height:320px;overflow:auto;white-space:pre-wrap;word-break:break-all;
@@ -145,6 +145,14 @@
     padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:550;
     font-family:inherit;margin:0 8px 8px 0;transition:.15s;min-height:38px}
   .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn:disabled:hover{border-color:var(--line);color:var(--ink)}
+  .btn.btn-off{color:var(--dim)}
+
+  /* canvas toolbar */
+  .cv-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .cv-tools .btn{margin:0}
+  .cv-hint{color:var(--dim);font-size:12px}
   .hide{display:none}
 
   footer{text-align:center;color:var(--dim);font-size:12.5px;
@@ -391,6 +399,11 @@ function parseZMX(text){
         const p = rest.split(/\s+/).map(v=>parseInt(v,10));
         doc.fieldType = p[0];      // 0 angle, 1 obj height, 2 par img ht, 3 real img ht
         doc.apertureType = p[1];
+        // Zemax always writes 24 WAVM slots and a fixed block of field values,
+        // regardless of how many are actually in use. These counts say how many
+        // of them are real; the rest hold stale defaults (commonly 0.55 um).
+        doc.numFields = (isFinite(p[2]) && p[2] > 0) ? p[2] : null;
+        doc.numWaves  = (isFinite(p[3]) && p[3] > 0) ? p[3] : null;
         doc.ftypRaw = rest;
         break;
       }
@@ -399,19 +412,48 @@ function parseZMX(text){
     }
   }
 
-  // de-duplicate wavelengths (files often store 24 identical slots)
-  const uniq = [...new Set(doc.wavelengths.map(w=>w.um))];
-  doc.uniqueWaves = uniq;
-  doc.monochromatic = uniq.length===1;
+  // Zemax writes a fixed 24 WAVM slots; only the first `numWaves` are in use and the
+  // remainder hold stale defaults. Trim to the declared count, then de-duplicate.
+  // Falling back to de-duplication only when the count is missing keeps older or
+  // hand-edited files working.
+  doc.wavelengths.sort((a,b)=>a.idx-b.idx);
+  if(doc.numWaves){
+    doc.activeWaves = doc.wavelengths.filter(w=>w.idx <= doc.numWaves);
+  } else {
+    const seen = new Set();
+    doc.activeWaves = doc.wavelengths.filter(w=>{
+      if(seen.has(w.um)) return false;
+      seen.add(w.um); return true;
+    });
+  }
+  doc.uniqueWaves = doc.activeWaves.map(w=>w.um);
+  doc.monochromatic = new Set(doc.uniqueWaves).size === 1;
+
+  // Field arrays are likewise padded; trim them to the declared field count.
+  if(doc.numFields){
+    doc.fieldsX = doc.fieldsX.slice(0, doc.numFields);
+    doc.fieldsY = doc.fieldsY.slice(0, doc.numFields);
+    if(doc.fieldWeights.length) doc.fieldWeights = doc.fieldWeights.slice(0, doc.numFields);
+  }
 
   return doc;
+}
+
+/* ---------- primary wavelength (PWAV points at a slot index, not always 1) ---------- */
+function primaryWave(doc){
+  if(doc && doc.activeWaves && doc.activeWaves.length){
+    const hit = doc.activeWaves.find(w=>w.idx === doc.primaryWave);
+    if(hit) return hit.um;
+    return doc.activeWaves[0].um;
+  }
+  return 0.55;
 }
 
 /* ---------- paraxial analysis (ABCD, reduced angles) ---------- */
 function paraxial(doc){
   const S = doc.surfaces;
   if(S.length<3) return null;
-  const wave = (doc.uniqueWaves && doc.uniqueWaves[0]) || 0.55;
+  const wave = primaryWave(doc);
 
   // build interface list between object and image
   // skip surface 0 (object) and the final image surface
@@ -553,7 +595,7 @@ function render(doc, filename){
     let glassCell = '—';
     if(s.mirror) glassCell = '<span class="tag mir">MIRROR</span>';
     else if(s.glass){
-      const n = sellmeierN(s.glass, doc.uniqueWaves[0]||0.55);
+      const n = sellmeierN(s.glass, primaryWave(doc));
       glassCell = s.glass + (n? ` <span style="color:var(--dim);font-size:11px">n=${n.toFixed(4)}</span>`:'');
     }
     let note = s.comment||'';
@@ -595,9 +637,9 @@ function render(doc, filename){
       <td class="num">${fmt(doc.fieldsY[i]??0,4)}</td>
       <td class="num">${fmt(doc.fieldWeights[i]??1,2)}</td></tr>`;
   }
-  const waveRows = doc.uniqueWaves.map((w,i)=>
-    `<tr><td class="idx">${i+1}${(i+1)===doc.primaryWave?' <span class="tag">primary</span>':''}</td>
-     <td class="num">${w.toFixed(4)}</td></tr>`).join('');
+  const waveRows = (doc.activeWaves||[]).map(w=>
+    `<tr><td class="idx">${w.idx}${w.idx===doc.primaryWave?' <span class="tag">primary</span>':''}</td>
+     <td class="num">${w.um.toFixed(4)}</td></tr>`).join('');
 
   out.appendChild(el(`<section><h2>Fields &amp; wavelengths</h2><div class="body">
     <div class="fw">
@@ -620,16 +662,32 @@ function render(doc, filename){
     </div></div></section>`));
 
   /* --- layout drawing --- */
+  // Rays only exist for pure refractive systems that produced a first-order solution.
+  const raysAvailable = !!(px && px.efl && !px.skip);
+  window.__showRays = raysAvailable;   // default on when they exist
   const canvasSec = el(`<section><h2>Layout — approximate</h2><div class="body">
     <div class="note"><b>This drawing can be wrong.</b> Rays are first-order (paraxial) only,
     not a real trace. Element shapes, thicknesses and spacings come straight from the
     prescription and are reliable; the ray paths are indicative. Tilts and decenters are
     listed in the table but the axis is drawn unfolded, so mirrors and coordinate breaks
     will not appear in their true positions.</div>
+    <div class="cv-tools">
+      <button class="btn" id="rayBtn" ${raysAvailable?'':'disabled'}>Hide rays</button>
+      ${raysAvailable?'':'<span class="cv-hint">Rays unavailable for systems with mirrors or coordinate breaks</span>'}
+    </div>
     <canvas id="cv"></canvas>
     </div></section>`);
   out.appendChild(canvasSec);
   drawLayout(doc, px, document.getElementById('cv'));
+  if(raysAvailable){
+    const rb = document.getElementById('rayBtn');
+    rb.onclick = ()=>{
+      window.__showRays = !window.__showRays;
+      rb.textContent = window.__showRays ? 'Hide rays' : 'Show rays';
+      rb.classList.toggle('btn-off', !window.__showRays);
+      drawLayout(doc, px, document.getElementById('cv'));
+    };
+  }
 
   /* --- raw text --- */
   const rawSec = el(`<section><h2>Raw file</h2><div class="body">
@@ -752,8 +810,8 @@ function drawLayout(doc, px, cv){
   ctx.fillStyle=C_DIM; ctx.font='12px sans-serif'; ctx.textAlign='center';
   ctx.fillText('IMAGE', X(zEnd), Y(maxSemi*0.62));
 
-  // first-order rays only for pure refractive systems
-  if(px && px.efl && !px.skip){
+  // first-order rays only for pure refractive systems, and only when toggled on
+  if(px && px.efl && !px.skip && window.__showRays !== false){
     const wave=px.wave;
     const heights=[0.98,0.5,0.001,-0.5,-0.98];
     const rayCol=cssv('--cv-ray', cssv('--accent','#5aa9e6'));
