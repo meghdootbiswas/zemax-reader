@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Zemax Reader</title>
+<meta name="description" content="Read Zemax sequential lens files in your browser. Nothing is uploaded.">
+<style>
+  :root{
+    --r:10px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  }
+  html[data-theme="dark"]{
+    --bg:#0d1117; --panel:#151b23; --panel2:#1b222c; --line:#28313c;
+    --ink:#e8eef5; --dim:#8d99a6; --accent:#5aa9e6; --accent2:#b48ce8;
+    --warn:#e0a458; --ok:#5cb87a; --shadow:0 1px 3px rgba(0,0,0,.4);
+    --cv-axis:#37424e; --cv-glass-fill:rgba(90,169,230,.18); --cv-glass-stroke:#8fc4e8; --cv-mirror:#b48ce8;
+    --cv-ray:#6cb6f0;
+  }
+  html[data-theme="light"]{
+    --bg:#f7f9fb; --panel:#ffffff; --panel2:#f0f4f8; --line:#dde5ee;
+    --ink:#12222f; --dim:#5f7183; --accent:#1a73c7; --accent2:#7b4fc4;
+    --warn:#b06d16; --ok:#2c8049; --shadow:0 1px 3px rgba(16,40,64,.08);
+    --cv-axis:#b6c3d1; --cv-glass-fill:rgba(26,115,199,.14); --cv-glass-stroke:#2f7cc4; --cv-mirror:#7b4fc4;
+    --cv-ray:#1668c4;
+  }
+  *{box-sizing:border-box}
+  html,body{max-width:100%;overflow-x:hidden}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);
+    -webkit-text-size-adjust:100%;transition:background .2s,color .2s}
+
+  /* ---------- top bar ---------- */
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:14px clamp(14px,4vw,28px);border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);z-index:20}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:16px;letter-spacing:-.2px}
+  .brand svg{width:20px;height:20px;flex:none;color:var(--accent)}
+  .toggle{display:flex;align-items:center;gap:6px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:99px;padding:4px;cursor:pointer}
+  .toggle button{border:0;background:none;color:var(--dim);cursor:pointer;
+    padding:5px 9px;border-radius:99px;display:grid;place-items:center;line-height:0;
+    transition:.15s;min-width:34px;min-height:30px}
+  .toggle button.on{background:var(--panel);color:var(--accent);box-shadow:var(--shadow)}
+  .toggle svg{width:15px;height:15px}
+
+  /* ---------- hero ---------- */
+  .hero{text-align:center;padding:clamp(32px,7vw,60px) clamp(16px,5vw,24px) clamp(20px,4vw,30px)}
+  h1{margin:0 0 12px;font-size:clamp(28px,6.2vw,44px);letter-spacing:-1px;font-weight:680;line-height:1.1}
+  .tagline{color:var(--dim);font-size:clamp(14px,2.4vw,17px);max-width:520px;margin:0 auto;line-height:1.55}
+
+  .wrap{max-width:1060px;margin:0 auto;padding:0 clamp(14px,4vw,24px) 60px}
+
+  /* ---------- dropzone ---------- */
+  #drop{border:1.5px dashed var(--line);border-radius:14px;
+    padding:clamp(28px,6vw,46px) clamp(16px,4vw,24px);text-align:center;
+    background:var(--panel);cursor:pointer;transition:.18s;position:relative}
+  #drop:hover,#drop.hot{border-color:var(--accent);
+    background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
+  #drop.hot{transform:scale(1.006)}
+  .dz-icon{width:38px;height:38px;color:var(--accent);margin:0 auto 12px;display:block}
+  .dz-main{font-size:clamp(15px,2.6vw,17px);font-weight:560}
+  .dz-main span{color:var(--accent)}
+  .dz-sub{color:var(--dim);font-size:13px;margin-top:7px}
+  .dz-badge{display:inline-block;margin-top:14px;padding:4px 11px;border-radius:99px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:12px}
+  input[type=file]{display:none}
+
+  /* ---------- caution ---------- */
+  .caution{margin-top:16px;display:flex;align-items:flex-start;gap:11px;
+    background:color-mix(in srgb,var(--warn) 10%,var(--panel));
+    border:1px solid color-mix(in srgb,var(--warn) 32%,var(--line));
+    border-radius:12px;padding:14px 16px}
+  .caution svg{width:19px;height:19px;color:var(--warn);flex:none;margin-top:2px}
+  .caution p{margin:0;font-size:13.5px;line-height:1.6}
+  .caution b{color:var(--warn)}
+
+  /* ---------- privacy ---------- */
+  .privacy{margin-top:16px;display:flex;align-items:flex-start;gap:11px;
+    background:color-mix(in srgb,var(--ok) 9%,var(--panel));
+    border:1px solid color-mix(in srgb,var(--ok) 28%,var(--line));
+    border-radius:12px;padding:14px 16px}
+  .privacy svg{width:19px;height:19px;color:var(--ok);flex:none;margin-top:2px}
+  .privacy p{margin:0;font-size:13.5px;line-height:1.6}
+  .privacy b{color:var(--ok)}
+  .privacy .fine{color:var(--dim);font-size:12.5px;margin-top:5px}
+
+  /* ---------- sections ---------- */
+  section{margin-top:22px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+  section>h2{margin:0;padding:12px clamp(13px,3vw,17px);font-size:12px;letter-spacing:.6px;
+    text-transform:uppercase;color:var(--dim);background:var(--panel2);
+    border-bottom:1px solid var(--line);font-weight:640}
+  .body{padding:clamp(13px,3vw,17px)}
+
+  /* ---------- tables ---------- */
+  .scroller{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+  .fw table{min-width:0}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--dim);font-weight:640;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  /* numeric headers must sit directly above their right-aligned values */
+  th.num{text-align:right;font-family:inherit}
+  th.idx,td.idx{text-align:left}
+  /* µ must never be uppercased — it renders as "M" */
+  th.nocaps{text-transform:none;letter-spacing:.2px;font-size:11.5px}
+
+  /* compact side-by-side tables for fields / wavelengths */
+  .fw{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,26px)}
+  .fw .mini{min-width:0;width:100%;table-layout:fixed}
+  .fw .mini th,.fw .mini td{padding:7px 8px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .fw-cap{margin:0 0 8px;color:var(--dim);font-size:13px;line-height:1.5}
+  .fw-cap b{color:var(--ink)}
+  .fw-unit{margin:7px 0 0;color:var(--dim);font-size:11.5px;opacity:.8}
+  td.num{font-family:var(--mono);text-align:right;font-size:12.5px}
+  tbody tr:last-child td{border-bottom:0}
+  tr.stop td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+  tr.mirror td{background:color-mix(in srgb,var(--accent2) 9%,transparent)}
+  .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:10.5px;
+    font-weight:650;background:var(--line);color:var(--ink);letter-spacing:.3px}
+  .tag.stop{background:var(--accent);color:#fff}
+  .tag.mir{background:var(--accent2);color:#fff}
+
+  /* ---------- cards ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .kv{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+  .kv .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .kv .v{font-size:clamp(15px,3vw,18px);font-family:var(--mono);margin-top:4px;word-break:break-word}
+
+  .note{border-left:3px solid var(--warn);padding:11px 14px;border-radius:0 8px 8px 0;
+    font-size:13.5px;margin-top:12px;line-height:1.6;
+    background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  .note b{color:var(--warn)}
+
+  canvas{width:100%;display:block;background:var(--panel2);border-radius:9px;
+    border:1px solid var(--line);margin-top:12px}
+
+  pre{margin:10px 0 0;font-family:var(--mono);font-size:11.5px;color:var(--dim);
+    max-height:320px;overflow:auto;white-space:pre-wrap;word-break:break-all;
+    background:var(--panel2);padding:12px;border-radius:8px;border:1px solid var(--line)}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:550;
+    font-family:inherit;margin:0 8px 8px 0;transition:.15s;min-height:38px}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .hide{display:none}
+
+  footer{text-align:center;color:var(--dim);font-size:12.5px;
+    padding:26px 20px 34px;border-top:1px solid var(--line)}
+  footer a{color:var(--dim)}
+
+  /* ---------- responsive ---------- */
+  @media(max-width:720px){
+    .fw{grid-template-columns:1fr!important;gap:22px!important}
+    .grid{grid-template-columns:repeat(auto-fit,minmax(128px,1fr))}
+    .btn{width:100%;margin-right:0}
+  }
+  @media(max-width:400px){
+    .grid{grid-template-columns:1fr 1fr}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>
+    </svg>
+    Zemax Reader
+  </div>
+  <div class="toggle" role="group" aria-label="Theme">
+    <button id="tDark" title="Dark" aria-label="Dark mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <button id="tLight" title="Light" aria-label="Light mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M19.1 4.9l-1.5 1.5M6.4 17.6l-1.5 1.5"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="hero">
+  <h1>Zemax Reader</h1>
+  <p class="tagline">Drop a Zemax file to see its full prescription, system data and layout.
+  Everything is read on your device.</p>
+</div>
+
+<div class="wrap">
+  <div id="drop" tabindex="0" role="button" aria-label="Choose a Zemax file">
+    <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>
+    </svg>
+    <div class="dz-main">Just drop a Zemax file — or <span>browse</span></div>
+    <div class="dz-sub">.zmx</div>
+    <div class="dz-badge">Sequential files supported</div>
+    <input type="file" id="file" accept=".zmx,.ZMX,.seq,.SEQ">
+  </div>
+
+  <div class="caution">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+      <path d="M12 9v4"/><path d="M12 17h.01"/>
+    </svg>
+    <p><b>Ray diagrams are approximate and can be wrong.</b>
+    Layouts and rays are drawn with first-order (paraxial) optics only — no real ray tracing.
+    Folded systems are shown unfolded, and designs using solves, pickups or model glasses may
+    render or compute incorrectly. Always verify against OpticStudio before relying on anything here.</p>
+  </div>
+
+  <div class="privacy">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>
+    </svg>
+    <p><b>Your designs never leave your device.</b>
+    This page has no server, no database and no analytics. Your file is opened locally in
+    your browser and is never uploaded, stored, logged or transmitted anywhere.
+    <span class="fine">No accounts, no cookies, no tracking. Close the tab and nothing remains —
+    you can even disconnect from the internet and it will keep working.</span></p>
+  </div>
+
+  <div id="out" class="hide"></div>
+</div>
+
+<footer>Reads Zemax sequential lens files entirely in your browser.</footer>
+
+<script>
+
+/* ============================================================
+   Zemax Reader — client-side sequential .zmx parser
+   ============================================================ */
+
+/* ---------- decoding: .zmx is usually UTF-16LE with BOM ---------- */
+function decodeZMX(buf){
+  const b = new Uint8Array(buf);
+  if (b.length>1 && b[0]===0xFF && b[1]===0xFE) return new TextDecoder('utf-16le').decode(buf);
+  if (b.length>1 && b[0]===0xFE && b[1]===0xFF) return new TextDecoder('utf-16be').decode(buf);
+  // heuristic: lots of NUL bytes in odd positions => UTF-16LE without BOM
+  let nul=0, n=Math.min(b.length,400);
+  for(let i=1;i<n;i+=2) if(b[i]===0) nul++;
+  if(nul > n/4) return new TextDecoder('utf-16le').decode(buf);
+  return new TextDecoder('utf-8').decode(buf);
+}
+
+const num = s => { const v=parseFloat(s); return isFinite(v)?v:null; };
+
+/* ---------- glass catalog: index at 0.55 um (Sellmeier, Schott) ---------- */
+const SELLMEIER = {
+  'N-BK7':   [1.03961212,0.231792344,1.01046945,0.00600069867,0.0200179144,103.560653],
+  'N-SF11':  [1.73759695,0.313747346,1.89878101,0.013188707,0.0623068142,155.23629],
+  'N-LASF35':[2.45505861,0.453006077,2.3851308,0.0135670404,0.054580302,167.904715],
+  'N-SF6':   [1.77931763,0.338149866,2.08734474,0.0133714182,0.0617533621,174.01759],
+  'N-BAF10': [1.5851495,0.143559385,1.08521269,0.00926681282,0.0424489805,105.613573],
+  'SF11':    [1.73848403,0.311168974,1.17490871,0.0136068604,0.0615960463,121.922711],
+  'N-SK16':  [1.34317774,0.241144399,0.994317969,0.00704687339,0.0229005,92.7508526],
+  'N-SF2':   [1.47343127,0.163681849,1.36920899,0.0109019098,0.0585683687,127.404933],
+  'F2':      [1.34533359,0.209073176,0.937357162,0.00997743871,0.0470450767,111.886764],
+  'N-FK51A': [0.971247817,0.216901417,0.904651666,0.00472301995,0.0153575612,168.68133],
+  'N-SF57':  [1.87543831,0.37375749,2.30001797,0.0141749518,0.0640509927,177.389795],
+  'N-LAK22': [1.14229781,0.535138441,1.04088385,0.00585778594,0.0198546147,100.834017],
+};
+function sellmeierN(name, umWave){
+  const c = SELLMEIER[(name||'').toUpperCase()] || SELLMEIER[name];
+  if(!c) return null;
+  const L2 = umWave*umWave;
+  let n2 = 1;
+  n2 += c[0]*L2/(L2-c[3]);
+  n2 += c[1]*L2/(L2-c[4]);
+  n2 += c[2]*L2/(L2-c[5]);
+  return Math.sqrt(n2);
+}
+
+/* ---------- surface type descriptions ---------- */
+const TYPEDESC = {
+  STANDARD:'Standard (sphere / conic)',
+  EVENASPH:'Even asphere',
+  ODDASPHE:'Odd asphere',
+  COORDBRK:'Coordinate break (tilt / decenter)',
+  PARAXIAL:'Ideal paraxial lens',
+  TOROIDAL:'Toroidal',
+  DGRATING:'Diffraction grating',
+  BINARY_2:'Binary optic 2',
+  ZERNSTAN:'Zernike standard sag',
+  IRREGULA:'Irregular surface',
+};
+
+/* ---------- header keyword meanings ---------- */
+const FIELD_TYPES = ['Angle (deg)','Object height','Paraxial image height','Real image height','Theodolite angle'];
+const HEADER_KEYS = {
+  VERS:'File version', MODE:'Mode', NAME:'Lens name', AUTH:'Author', NOTE:'Notes',
+  UNIT:'Units', ENPD:'Entrance pupil diameter', OBNA:'Object-space NA',
+  FLOA:'Float by stop size', GCAT:'Glass catalogs', PWAV:'Primary wavelength #',
+  ENVD:'Environment (T, P)', GSTD:'Global surface reference',
+  EFFL:'Merit operand: EFFL', TOL:'Tolerance data', COFN:'Comment/file names',
+};
+
+/* ---------- the parser ---------- */
+function parseZMX(text){
+  const lines = text.split(/\r?\n/);
+  const doc = {
+    header:{}, raw:text, wavelengths:[], fieldsX:[], fieldsY:[], fieldWeights:[],
+    surfaces:[], mode:null, unit:'mm', name:'', author:'', notes:[],
+    fieldType:null, apertureType:null, enpd:null, floatStop:false,
+    glassCats:'', primaryWave:1, warnings:[]
+  };
+  let cur = null;
+
+  for(const raw of lines){
+    if(!raw.trim()) continue;
+    const indented = /^\s/.test(raw);
+    const line = raw.trim();
+    const sp = line.indexOf(' ');
+    const key = (sp<0? line : line.slice(0,sp));
+    const rest = (sp<0? '' : line.slice(sp+1)).trim();
+
+    // -------- surface block start --------
+    if(key==='SURF' && !indented){
+      cur = {n:parseInt(rest,10), type:'STANDARD', curv:0, conic:0, thick:0,
+             glass:null, glassRaw:null, semidia:null, comment:'', stop:false,
+             mirror:false, params:{}, flags:{}, ignored:false};
+      doc.surfaces.push(cur);
+      continue;
+    }
+
+    // -------- inside a surface --------
+    if(cur && indented){
+      switch(key){
+        case 'TYPE': cur.type = rest.split(/\s+/)[0]; break;
+        case 'CURV': cur.curv = num(rest.split(/\s+/)[0]) ?? 0; break;
+        case 'CONI': cur.conic = num(rest.split(/\s+/)[0]) ?? 0; break;
+        case 'DISZ': {
+          const t = rest.split(/\s+/)[0];
+          cur.thick = /INFINITY/i.test(t) ? Infinity : (num(t) ?? 0);
+          break;
+        }
+        case 'GLAS': {
+          cur.glassRaw = rest;
+          const p = rest.split(/\s+/);
+          cur.glass = p[0];
+          // GLAS <name> <code> <flag> <n_d> <V_d> <dPgF> ...
+          cur.glassModelN = num(p[3]);
+          cur.glassModelV = num(p[4]);
+          cur.glassCode   = p[1];
+          cur.glassFlag   = p[2];
+          if(/^MIRROR$/i.test(p[0])) cur.mirror = true;
+          break;
+        }
+        case 'DIAM': cur.semidia = num(rest.split(/\s+/)[0]); break;
+        case 'COMM': cur.comment = rest.replace(/^"|"$/g,''); break;
+        case 'STOP': cur.stop = true; break;
+        case 'MIRR': cur.flags.MIRR = rest; break;
+        case 'PARM': {
+          const p = rest.split(/\s+/);
+          cur.params[parseInt(p[0],10)] = num(p[1]);
+          break;
+        }
+        case 'FLAP': cur.flags.FLAP = rest; break;
+        case 'OBSC': cur.flags.OBSC = rest; break;
+        case 'SLAB': case 'SSID': case 'HIDE': case 'MEMA':
+        case 'POPS': case 'FIMP': case 'PZUP': case 'SFSM': case 'VDSZ':
+          cur.flags[key] = rest; break;
+      }
+      continue;
+    }
+
+    // -------- top-level header keywords --------
+    switch(key){
+      case 'MODE': doc.mode = rest; break;
+      case 'NAME': doc.name = rest; break;
+      case 'AUTH': doc.author = rest; break;
+      case 'NOTE': doc.notes.push(rest); break;
+      case 'UNIT': doc.unit = rest.split(/\s+/)[0] || 'mm'; break;
+      case 'ENPD': doc.enpd = num(rest); break;
+      case 'FLOA': doc.floatStop = true; break;
+      case 'GCAT': doc.glassCats = rest; break;
+      case 'PWAV': doc.primaryWave = parseInt(rest,10)||1; break;
+      case 'WAVM': {
+        const p = rest.split(/\s+/);
+        const idx = parseInt(p[0],10), w = num(p[1]), wt = num(p[2]);
+        if(w!==null) doc.wavelengths.push({idx, um:w, weight:wt});
+        break;
+      }
+      case 'XFLN': doc.fieldsX = rest.split(/\s+/).map(num).filter(v=>v!==null); break;
+      case 'YFLN': doc.fieldsY = rest.split(/\s+/).map(num).filter(v=>v!==null); break;
+      case 'FWGN': doc.fieldWeights = rest.split(/\s+/).map(num).filter(v=>v!==null); break;
+      case 'FTYP': {
+        const p = rest.split(/\s+/).map(v=>parseInt(v,10));
+        doc.fieldType = p[0];      // 0 angle, 1 obj height, 2 par img ht, 3 real img ht
+        doc.apertureType = p[1];
+        doc.ftypRaw = rest;
+        break;
+      }
+      default:
+        if(HEADER_KEYS[key] && !(key in doc.header)) doc.header[key]=rest;
+    }
+  }
+
+  // de-duplicate wavelengths (files often store 24 identical slots)
+  const uniq = [...new Set(doc.wavelengths.map(w=>w.um))];
+  doc.uniqueWaves = uniq;
+  doc.monochromatic = uniq.length===1;
+
+  return doc;
+}
+
+/* ---------- paraxial analysis (ABCD, reduced angles) ---------- */
+function paraxial(doc){
+  const S = doc.surfaces;
+  if(S.length<3) return null;
+  const wave = (doc.uniqueWaves && doc.uniqueWaves[0]) || 0.55;
+
+  // build interface list between object and image
+  // skip surface 0 (object) and the final image surface
+  const inner = S.slice(1, S.length-1);
+  if(!inner.length) return null;
+
+  // determine index after each surface
+  let nb = 1.0;
+  const ifs = [];
+  let anyUnknownGlass = false, anyMirror = false, anyCB = false;
+
+  for(const s of inner){
+    if(s.type==='COORDBRK'){ anyCB = true; ifs.push({cb:true, thick:s.thick}); continue; }
+    let na;
+    if(s.mirror){ anyMirror = true; na = -nb; }         // reflection flips direction
+    else if(!s.glass){ na = 1.0; }
+    else {
+      const sm = sellmeierN(s.glass, wave);
+      if(sm) na = sm;
+      else if(s.glassModelN && s.glassModelN>1.05) na = s.glassModelN;
+      else { na = null; anyUnknownGlass = true; }
+    }
+    ifs.push({curv:s.curv, n1:nb, n2:na, thick:s.thick, mirror:s.mirror, name:s.glass});
+    if(na!==null) nb = na;
+  }
+
+  if(anyUnknownGlass || anyMirror || anyCB){
+    return {skip:true, anyUnknownGlass, anyMirror, anyCB, wave};
+  }
+
+  // ABCD on state [y, n*u]
+  let A=1,B=0,C=0,D=1;
+  const mul=(a,b,c,d)=>{ // [[a,b],[c,d]] * current
+    const A2=a*A+b*C, B2=a*B+b*D, C2=c*A+d*C, D2=c*B+d*D;
+    A=A2;B=B2;C=C2;D=D2;
+  };
+  for(let i=0;i<ifs.length;i++){
+    const s=ifs[i];
+    const P=(s.n2-s.n1)*s.curv;
+    mul(1,0,-P,1);                       // refraction
+    if(i<ifs.length-1 && isFinite(s.thick)) mul(1,s.thick/s.n2,0,1); // transfer
+  }
+  if(Math.abs(C)<1e-12) return {afocal:true, wave};
+  const efl = -1/C;
+  const bfd = -A/C;
+  const lastThick = ifs[ifs.length-1].thick;
+  // If the file floats by stop size, ENPD is absent — estimate the pupil from the
+  // stop semi-diameter. This is approximate (ignores pupil magnification by any
+  // elements ahead of the stop) and is labelled as such in the UI.
+  let epd = doc.enpd, epdEstimated = false;
+  if(!epd){
+    const stop = doc.surfaces.find(s=>s.stop);
+    if(stop && stop.semidia){ epd = 2*stop.semidia; epdEstimated = true; }
+  }
+  return {efl, bfd, wave, epd, epdEstimated,
+          fnum: (epd? efl/epd : null),
+          storedImageDist: isFinite(lastThick)? lastThick : null};
+}
+
+/* ---------- rendering ---------- */
+const el = (h)=>{const d=document.createElement('div'); d.innerHTML=h.trim(); return d.firstChild;};
+const fmt = (v,d=4)=> v===null||v===undefined?'—':(isFinite(v)? (Math.abs(v)>=1e5? v.toExponential(3): v.toFixed(d).replace(/\.?0+$/,'')) : (v===Infinity?'∞':'—'));
+
+function render(doc, filename){
+  window.__doc = doc; window.__fn = filename;
+  const out = document.getElementById('out');
+  out.className='';
+  out.innerHTML='';
+
+  const px = paraxial(doc);
+
+  /* --- system summary --- */
+  const S = doc.surfaces;
+  const realSurf = S.slice(1,S.length-1);
+  const nGlass = realSurf.filter(s=>s.glass && !s.mirror).length;
+  const nMirror = realSurf.filter(s=>s.mirror).length;
+  const nCB = realSurf.filter(s=>s.type==='COORDBRK').length;
+  const elements = Math.max(0, Math.round(nGlass));
+  const totalLen = realSurf.reduce((a,s)=> a + (isFinite(s.thick)? s.thick : 0), 0);
+
+  let cards = [
+    ['Mode', doc.mode||'—'],
+    ['Units', doc.unit||'mm'],
+    ['Surfaces', String(S.length)],
+    ['Refracting', String(nGlass)],
+  ];
+  if(nMirror) cards.push(['Mirrors', String(nMirror)]);
+  if(nCB) cards.push(['Coord. breaks', String(nCB)]);
+  if(doc.enpd) cards.push(['Entrance pupil', fmt(doc.enpd,2)+' '+doc.unit]);
+  cards.push(['Track length', fmt(totalLen,2)+' '+doc.unit]);
+  if(doc.uniqueWaves.length) cards.push(['Wavelength'+(doc.uniqueWaves.length>1?'s':''),
+      doc.uniqueWaves.map(w=>w.toFixed(4).replace(/0+$/,'')).join(', ')+' µm']);
+  if(px && px.efl){
+    cards.push(['EFL (paraxial)', fmt(px.efl,2)+' '+doc.unit]);
+    if(px.fnum) cards.push([px.epdEstimated?'f/number (approx)':'f/number',
+                            'f/'+Math.abs(px.fnum).toFixed(2)]);
+    if(px.epdEstimated) cards.push(['Pupil source','from stop Ø']);
+    cards.push(['Back focal dist.', fmt(px.bfd,2)+' '+doc.unit]);
+  }
+
+  const sysSec = el(`<section><h2>System summary${doc.name?' — '+doc.name:''}</h2><div class="body"></div></section>`);
+  const g = el('<div class="grid"></div>');
+  cards.forEach(([k,v])=> g.appendChild(el(`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`)));
+  sysSec.querySelector('.body').appendChild(g);
+
+  if(doc.author) sysSec.querySelector('.body').appendChild(el(`<p style="color:var(--dim);font-size:13px;margin:12px 0 0">Author: ${doc.author}</p>`));
+  out.appendChild(sysSec);
+
+  /* --- consistency check --- */
+  if(px && px.efl && px.storedImageDist!==null){
+    const diff = Math.abs(px.bfd - px.storedImageDist);
+    const rel = diff/Math.max(1,Math.abs(px.storedImageDist));
+    const ok = rel < 0.02;
+    const msg = ok
+      ? `<b>Consistent.</b> Paraxial back focal distance (${fmt(px.bfd,2)} ${doc.unit}) matches the stored image distance (${fmt(px.storedImageDist,2)} ${doc.unit}). Collimated input focuses at the image plane.`
+      : `<b>Check needed.</b> Paraxial back focus computes to ${fmt(px.bfd,2)} ${doc.unit}, but the file stores ${fmt(px.storedImageDist,2)} ${doc.unit} to the image plane. This usually means the design uses model glasses, index solves, or pickups that this parser does not resolve — not necessarily a bad design.`;
+    out.appendChild(el(`<section><h2>Paraxial consistency</h2><div class="body">
+      <div class="note" style="border-left-color:${ok?'var(--ok)':'var(--warn)'};background:${ok?'rgba(92,184,122,.1)':'rgba(224,164,88,.1)'}">${msg}</div>
+      </div></section>`));
+  } else if(px && px.skip){
+    const why=[];
+    if(px.anyMirror) why.push('mirrors');
+    if(px.anyCB) why.push('coordinate breaks (tilts)');
+    if(px.anyUnknownGlass) why.push('glasses not in the built-in catalog');
+    out.appendChild(el(`<section><h2>Paraxial analysis</h2><div class="body">
+      <div class="note">Skipped automatic first-order analysis because this system contains ${why.join(' and ')}.
+      Folded and catadioptric systems need a full 3-D trace; the prescription below is still exact.</div>
+      </div></section>`));
+  }
+
+  /* --- prescription table --- */
+  const tSec = el(`<section><h2>Surface prescription</h2><div class="body"><div class="scroller"></div></div></section>`);
+  let rows = '';
+  S.forEach((s,i)=>{
+    const isObj = i===0, isImg = i===S.length-1;
+    const label = isObj?'OBJ':(isImg?'IMG':String(s.n));
+    const R = (s.curv && Math.abs(s.curv)>1e-12)? (1/s.curv) : Infinity;
+    const cls = s.stop?'stop':(s.mirror?'mirror':'');
+    let glassCell = '—';
+    if(s.mirror) glassCell = '<span class="tag mir">MIRROR</span>';
+    else if(s.glass){
+      const n = sellmeierN(s.glass, doc.uniqueWaves[0]||0.55);
+      glassCell = s.glass + (n? ` <span style="color:var(--dim);font-size:11px">n=${n.toFixed(4)}</span>`:'');
+    }
+    let note = s.comment||'';
+    if(s.stop) note = (note?note+' ':'') + '<span class="tag stop">STOP</span>';
+    if(s.type==='COORDBRK'){
+      const tx=s.params[3], ty=s.params[4];
+      const bits=[];
+      if(s.params[1]) bits.push('dec X '+fmt(s.params[1],3));
+      if(s.params[2]) bits.push('dec Y '+fmt(s.params[2],3));
+      if(tx) bits.push('tilt X '+fmt(tx,3)+'°');
+      if(ty) bits.push('tilt Y '+fmt(ty,3)+'°');
+      note = (note?note+' — ':'') + (bits.join(', ')||'no offset');
+    }
+    rows += `<tr class="${cls}">
+      <td>${label}</td>
+      <td>${TYPEDESC[s.type]||s.type}</td>
+      <td class="num">${R===Infinity?'∞':fmt(R,4)}</td>
+      <td class="num">${s.thick===Infinity?'∞':fmt(s.thick,4)}</td>
+      <td>${glassCell}</td>
+      <td class="num">${fmt(s.semidia,3)}</td>
+      <td class="num">${s.conic?fmt(s.conic,4):'0'}</td>
+      <td style="font-size:12px;color:var(--dim)">${note}</td>
+    </tr>`;
+  });
+  tSec.querySelector('.scroller').innerHTML =
+    `<table><thead><tr>
+      <th>#</th><th>Type</th><th class="num">Radius</th><th class="num">Thickness</th>
+      <th>Glass</th><th class="num">Semi-Ø</th><th class="num">Conic</th><th>Notes</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  out.appendChild(tSec);
+
+  /* --- fields & wavelengths --- */
+  const ftName = FIELD_TYPES[doc.fieldType] || 'unknown';
+  const fUnit = doc.fieldType===0 ? '°' : (doc.unit||'mm');
+  let fieldRows = '';
+  const nF = Math.max(doc.fieldsX.length, doc.fieldsY.length);
+  for(let i=0;i<nF;i++){
+    fieldRows += `<tr><td class="idx">${i+1}</td><td class="num">${fmt(doc.fieldsX[i]??0,4)}</td>
+      <td class="num">${fmt(doc.fieldsY[i]??0,4)}</td>
+      <td class="num">${fmt(doc.fieldWeights[i]??1,2)}</td></tr>`;
+  }
+  const waveRows = doc.uniqueWaves.map((w,i)=>
+    `<tr><td class="idx">${i+1}${(i+1)===doc.primaryWave?' <span class="tag">primary</span>':''}</td>
+     <td class="num">${w.toFixed(4)}</td></tr>`).join('');
+
+  out.appendChild(el(`<section><h2>Fields &amp; wavelengths</h2><div class="body">
+    <div class="fw">
+      <div>
+        <p class="fw-cap">Field type: <b>${ftName}</b>${doc.fieldType===0?' — object at infinity':''}</p>
+        <table class="mini">
+          <colgroup><col style="width:22%"><col style="width:26%"><col style="width:26%"><col style="width:26%"></colgroup>
+          <thead><tr><th class="idx">#</th><th class="num">X</th><th class="num">Y</th><th class="num">Weight</th></tr></thead>
+          <tbody>${fieldRows||'<tr><td colspan="4">—</td></tr>'}</tbody></table>
+        <p class="fw-unit">values in ${fUnit}</p>
+      </div>
+      <div>
+        <p class="fw-cap">${doc.monochromatic?'<b style="color:var(--warn)">Monochromatic</b> — all slots identical':'Polychromatic'}</p>
+        <table class="mini">
+          <colgroup><col style="width:52%"><col style="width:48%"></colgroup>
+          <thead><tr><th class="idx">#</th><th class="num nocaps">Wavelength (µm)</th></tr></thead>
+          <tbody>${waveRows||'<tr><td colspan="2">—</td></tr>'}</tbody></table>
+        <p class="fw-unit">µm = micrometres</p>
+      </div>
+    </div></div></section>`));
+
+  /* --- layout drawing --- */
+  const canvasSec = el(`<section><h2>Layout — approximate</h2><div class="body">
+    <div class="note"><b>This drawing can be wrong.</b> Rays are first-order (paraxial) only,
+    not a real trace. Element shapes, thicknesses and spacings come straight from the
+    prescription and are reliable; the ray paths are indicative. Tilts and decenters are
+    listed in the table but the axis is drawn unfolded, so mirrors and coordinate breaks
+    will not appear in their true positions.</div>
+    <canvas id="cv"></canvas>
+    </div></section>`);
+  out.appendChild(canvasSec);
+  drawLayout(doc, px, document.getElementById('cv'));
+
+  /* --- raw text --- */
+  const rawSec = el(`<section><h2>Raw file</h2><div class="body">
+     <button class="btn" id="tgl">Show raw text</button>
+     <button class="btn" id="csv">Download prescription CSV</button>
+     <button class="btn" id="jsonb">Download JSON</button>
+     <pre id="rawpre" class="hide"></pre></div></section>`);
+  out.appendChild(rawSec);
+  document.getElementById('rawpre').textContent = doc.raw;
+  document.getElementById('tgl').onclick = e=>{
+    const p=document.getElementById('rawpre');
+    p.classList.toggle('hide');
+    e.target.textContent = p.classList.contains('hide')?'Show raw text':'Hide raw text';
+  };
+  document.getElementById('csv').onclick = ()=>downloadCSV(doc, filename);
+  document.getElementById('jsonb').onclick = ()=>downloadJSON(doc, px, filename);
+}
+
+/* ---------- layout canvas ---------- */
+function cssv(name, fallback){
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+function drawLayout(doc, px, cv){
+  const ctx = cv.getContext('2d');
+  // hi-dpi + responsive sizing
+  const cssW = cv.clientWidth || 900;
+  const ratio = window.devicePixelRatio || 1;
+  const cssH = Math.max(240, Math.min(430, Math.round(cssW * 0.42)));
+  cv.width  = Math.round(cssW * ratio);
+  cv.height = Math.round(cssH * ratio);
+  cv.style.height = cssH + 'px';
+  ctx.setTransform(ratio,0,0,ratio,0,0);
+  const W=cssW, H=cssH;
+  const C_AXIS=cssv('--cv-axis','#3a4753'), C_GLASS_F=cssv('--cv-glass-fill','rgba(74,163,223,.18)'),
+        C_GLASS_S=cssv('--cv-glass-stroke','#8fc4e8'), C_MIR=cssv('--cv-mirror','#b48ce8'),
+        C_INK=cssv('--ink','#e6edf3'), C_DIM=cssv('--dim','#8b98a5');
+  ctx.clearRect(0,0,W,H);
+  const S = doc.surfaces;
+  const inner = S.slice(1, S.length-1).filter(s=>s.type!=='COORDBRK');
+  if(!inner.length) return;
+
+  // z positions
+  let z=0; const pos=[];
+  for(const s of inner){ pos.push(z); z += (isFinite(s.thick)? s.thick:0); }
+  const zEnd = z;
+  const maxSemi = Math.max(...inner.map(s=>s.semidia||0), 1);
+
+  const padL=60,padR=60,padT=40,padB=50;
+  const sx = (W-padL-padR)/Math.max(zEnd,1e-6);
+  const sy = (H-padT-padB)/2/(maxSemi*1.25);
+  const sc = Math.min(sx,sy);
+  const X = zz => padL + zz*sc;
+  const Y = yy => H/2 - yy*sc;
+
+  // axis
+  ctx.strokeStyle=C_AXIS; ctx.setLineDash([7,6]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(padL-30,H/2); ctx.lineTo(W-padR+30,H/2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const sagAt=(curv,conic,y)=>{
+    if(!curv || Math.abs(curv)<1e-12) return 0;
+    const r=1/curv, k=conic||0;
+    const t=1-(1+k)*y*y*curv*curv;
+    if(t<0) return 0;
+    return (curv*y*y)/(1+Math.sqrt(t));
+  };
+
+  // group into elements (glass between consecutive surfaces)
+  for(let i=0;i<inner.length;i++){
+    const s=inner[i];
+    const semi=s.semidia||maxSemi;
+    // draw glass body if this surface has glass and is not a mirror
+    if(s.glass && !s.mirror && i+1<inner.length){
+      const s2=inner[i+1];
+      const sm=Math.max(semi, s2.semidia||semi);
+      ctx.beginPath();
+      for(let k=0;k<=60;k++){
+        const y=-sm+2*sm*k/60;
+        const zz=pos[i]+sagAt(s.curv,s.conic,y);
+        k?ctx.lineTo(X(zz),Y(y)):ctx.moveTo(X(zz),Y(y));
+      }
+      for(let k=60;k>=0;k--){
+        const y=-sm+2*sm*k/60;
+        const zz=pos[i+1]+sagAt(s2.curv,s2.conic,y);
+        ctx.lineTo(X(zz),Y(y));
+      }
+      ctx.closePath();
+      ctx.fillStyle=C_GLASS_F;
+      ctx.strokeStyle=C_GLASS_S; ctx.lineWidth=1.6;
+      ctx.fill(); ctx.stroke();
+    }
+    // mirrors drawn as thick arcs
+    if(s.mirror){
+      ctx.beginPath();
+      for(let k=0;k<=60;k++){
+        const y=-semi+2*semi*k/60;
+        const zz=pos[i]+sagAt(s.curv,s.conic,y);
+        k?ctx.lineTo(X(zz),Y(y)):ctx.moveTo(X(zz),Y(y));
+      }
+      ctx.strokeStyle=C_MIR; ctx.lineWidth=4; ctx.stroke();
+    }
+    // stop
+    if(s.stop && !s.mirror){
+      ctx.strokeStyle=C_INK; ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(X(pos[i]),Y(semi)); ctx.lineTo(X(pos[i]),Y(semi*1.35));
+      ctx.moveTo(X(pos[i]),Y(-semi)); ctx.lineTo(X(pos[i]),Y(-semi*1.35));
+      ctx.stroke();
+      ctx.fillStyle=C_DIM; ctx.font='12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('STOP', X(pos[i]), Y(semi*1.45));
+    }
+  }
+
+  // image plane
+  ctx.strokeStyle=C_DIM; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(X(zEnd),Y(maxSemi*0.55)); ctx.lineTo(X(zEnd),Y(-maxSemi*0.55));
+  ctx.stroke();
+  ctx.fillStyle=C_DIM; ctx.font='12px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('IMAGE', X(zEnd), Y(maxSemi*0.62));
+
+  // first-order rays only for pure refractive systems
+  if(px && px.efl && !px.skip){
+    const wave=px.wave;
+    const heights=[0.98,0.5,0.001,-0.5,-0.98];
+    const rayCol=cssv('--cv-ray', cssv('--accent','#5aa9e6'));
+    const alphas=[.95,.7,.55,.7,.95];
+    const pupil = (doc.enpd? doc.enpd/2 : maxSemi*0.85);
+    heights.forEach((h,ci)=>{
+      let y=pupil*h, u=0, nb=1.0;
+      ctx.beginPath();
+      ctx.moveTo(X(-padL/sc*0.6), Y(y));
+      ctx.lineTo(X(0),Y(y));
+      for(let i=0;i<inner.length;i++){
+        const s=inner[i];
+        let na;
+        if(!s.glass) na=1.0;
+        else { const sm=sellmeierN(s.glass,wave); na = sm|| s.glassModelN || 1.0; }
+        const P=(na-nb)*s.curv;
+        u=(nb*u - y*P)/na;
+        nb=na;
+        const d = (i<inner.length-1)? (isFinite(s.thick)?s.thick:0) : (isFinite(s.thick)?s.thick:0);
+        const y2 = y + u*d;
+        ctx.lineTo(X(pos[i]+d),Y(y2));
+        y=y2;
+      }
+      ctx.strokeStyle=rayCol; ctx.lineWidth=1.2; ctx.globalAlpha=alphas[ci];
+      ctx.stroke(); ctx.globalAlpha=1;
+    });
+  }
+
+  // scale bar
+  ctx.fillStyle=C_DIM; ctx.font='12px sans-serif'; ctx.textAlign='left';
+  ctx.fillText(`0 → ${zEnd.toFixed(1)} ${doc.unit}`, padL, H-18);
+}
+
+/* ---------- exports ---------- */
+function downloadCSV(doc, fn){
+  const rows=[['Surface','Type','Radius','Thickness','Glass','SemiDiameter','Conic','Comment','Stop']];
+  doc.surfaces.forEach((s,i)=>{
+    const label = i===0?'OBJ':(i===doc.surfaces.length-1?'IMG':s.n);
+    const R=(s.curv&&Math.abs(s.curv)>1e-12)?(1/s.curv):'Infinity';
+    rows.push([label,s.type,R,(s.thick===Infinity?'Infinity':s.thick),
+      s.mirror?'MIRROR':(s.glass||''),s.semidia??'',s.conic??0,s.comment||'',s.stop?'YES':'']);
+  });
+  const csv=rows.map(r=>r.map(v=>`"${String(v)}"`).join(',')).join('\n');
+  saveBlob(csv,'text/csv',(fn||'prescription').replace(/\.[^.]+$/,'')+'_prescription.csv');
+}
+function downloadJSON(doc,px,fn){
+  const o={file:fn,name:doc.name,mode:doc.mode,units:doc.unit,
+    entrancePupilDiameter:doc.enpd,fieldType:FIELD_TYPES[doc.fieldType]||null,
+    fieldsX:doc.fieldsX,fieldsY:doc.fieldsY,wavelengths_um:doc.uniqueWaves,
+    paraxial:px&&px.efl?{efl:px.efl,bfd:px.bfd,fnumber:px.fnum}:null,
+    surfaces:doc.surfaces.map((s,i)=>({
+      index:i,label:i===0?'OBJ':(i===doc.surfaces.length-1?'IMG':s.n),
+      type:s.type,radius:(s.curv&&Math.abs(s.curv)>1e-12)?1/s.curv:null,
+      curvature:s.curv,thickness:s.thick===Infinity?'Infinity':s.thick,
+      glass:s.mirror?'MIRROR':s.glass,semiDiameter:s.semidia,conic:s.conic,
+      stop:s.stop,comment:s.comment,parameters:s.params}))};
+  saveBlob(JSON.stringify(o,null,2),'application/json',
+    (fn||'lens').replace(/\.[^.]+$/,'')+'.json');
+}
+function saveBlob(data,mime,name){
+  const b=new Blob([data],{type:mime}), u=URL.createObjectURL(b);
+  const a=document.createElement('a'); a.href=u; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+
+
+/* ---------- theme ---------- */
+const root = document.documentElement;
+function setTheme(t){
+  root.setAttribute('data-theme', t);
+  document.getElementById('tDark').classList.toggle('on', t==='dark');
+  document.getElementById('tLight').classList.toggle('on', t==='light');
+  try{ localStorage.setItem('zr-theme', t); }catch(e){}
+  if(window.__doc){
+    const cv=document.getElementById('cv');
+    if(cv) drawLayout(window.__doc, paraxial(window.__doc), cv);
+  }
+}
+let saved=null;
+try{ saved=localStorage.getItem('zr-theme'); }catch(e){}
+if(!saved) saved = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+setTheme(saved);
+document.getElementById('tDark').onclick = ()=>setTheme('dark');
+document.getElementById('tLight').onclick = ()=>setTheme('light');
+
+/* ---------- redraw on resize / rotate ---------- */
+let rT;
+addEventListener('resize', ()=>{
+  clearTimeout(rT);
+  rT=setTimeout(()=>{
+    if(window.__doc){
+      const cv=document.getElementById('cv');
+      if(cv) drawLayout(window.__doc, paraxial(window.__doc), cv);
+    }
+  },140);
+});
+
+/* ---------- file input ---------- */
+const drop=document.getElementById('drop'), fileIn=document.getElementById('file');
+drop.onclick=()=>fileIn.click();
+drop.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fileIn.click(); } };
+fileIn.onchange=e=>{ if(e.target.files[0]) load(e.target.files[0]); };
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault(); drop.classList.remove('hot'); }));
+drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) load(f); });
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>e.preventDefault());
+
+function load(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const text=decodeZMX(r.result);
+      const doc=parseZMX(text);
+      if(!doc.surfaces.length) throw new Error('No surface data found — this may not be a sequential Zemax file.');
+      render(doc,file.name);
+      const out=document.getElementById('out');
+      setTimeout(()=>out.scrollIntoView({behavior:'smooth',block:'start'}),60);
+    }catch(err){
+      const out=document.getElementById('out');
+      out.className='';
+      out.innerHTML=`<section><h2>Could not read this file</h2><div class="body">
+        <div class="note"><b>${err.message}</b><br>
+        This reader handles sequential text-based <code>.zmx</code> and <code>.seq</code> files.
+        Binary <code>.zos</code> sessions and zipped <code>.zar</code> archives are not supported yet.</div>
+        </div></section>`;
+      out.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  };
+  r.onerror=()=>alert('Could not read that file.');
+  r.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>
