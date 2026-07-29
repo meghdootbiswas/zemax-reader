@@ -14,17 +14,17 @@
   }
   html[data-theme="dark"]{
     --bg:#0d1117; --panel:#151b23; --panel2:#1b222c; --line:#28313c;
-    --ink:#e8eef5; --dim:#8d99a6; --accent:#5aa9e6; --accent2:#b48ce8;
+    --ink:#e8eef5; --dim:#8d99a6; --accent:#4caf72; --accent2:#7fd8a0;
     --warn:#e0a458; --ok:#5cb87a; --shadow:0 1px 3px rgba(0,0,0,.4);
-    --cv-axis:#37424e; --cv-glass-fill:rgba(90,169,230,.18); --cv-glass-stroke:#8fc4e8; --cv-mirror:#b48ce8;
-    --cv-ray:#6cb6f0;
+    --cv-axis:#37424e; --cv-glass-fill:rgba(76,175,114,.18); --cv-glass-stroke:#7fd8a0; --cv-mirror:#7fd8a0;
+    --cv-ray:#5cc98a;
   }
   html[data-theme="light"]{
     --bg:#f7f9fb; --panel:#ffffff; --panel2:#f0f4f8; --line:#dde5ee;
-    --ink:#12222f; --dim:#5f7183; --accent:#1a73c7; --accent2:#7b4fc4;
+    --ink:#12222f; --dim:#5f7183; --accent:#1e8a4c; --accent2:#2fa968;
     --warn:#b06d16; --ok:#2c8049; --shadow:0 1px 3px rgba(16,40,64,.08);
-    --cv-axis:#b6c3d1; --cv-glass-fill:rgba(26,115,199,.14); --cv-glass-stroke:#2f7cc4; --cv-mirror:#7b4fc4;
-    --cv-ray:#1668c4;
+    --cv-axis:#b6c3d1; --cv-glass-fill:rgba(30,138,76,.14); --cv-glass-stroke:#2fa968; --cv-mirror:#2fa968;
+    --cv-ray:#1e8a4c;
   }
   *{box-sizing:border-box}
   html,body{max-width:100%;overflow-x:hidden}
@@ -175,9 +175,6 @@
 
 <div class="bar">
   <div class="brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-      <ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>
-    </svg>
     Zemax Reader
   </div>
   <div class="toggle" role="group" aria-label="Theme">
@@ -234,7 +231,7 @@
   <div id="out" class="hide"></div>
 </div>
 
-<footer>Reads Zemax sequential lens files entirely in your browser.</footer>
+<footer>Reads Zemax sequential lens files entirely in your browser.<br>Created by Meghdoot Biswas, MS, University of Arizona</footer>
 
 <script>
 
