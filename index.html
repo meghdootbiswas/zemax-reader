@@ -14,15 +14,17 @@
   }
   html[data-theme="dark"]{
     --bg:#0d1117; --panel:#151b23; --panel2:#1b222c; --line:#28313c;
-    --ink:#e8eef5; --dim:#8d99a6; --accent:#4caf72; --accent2:#7fd8a0;
-    --warn:#e0a458; --ok:#5cb87a; --shadow:0 1px 3px rgba(0,0,0,.4);
+    --ink:#e8eef5; --dim:#8d99a6; --accent:#4caf72; --accent2:#7fd8a0; --mir-ink:#0f2418;
+    --stop:#8a5fd8; --cv-stop:#a781e8;
+    --warn:#e0a458; --ok:#3fb8ae; --shadow:0 1px 3px rgba(0,0,0,.4);
     --cv-axis:#37424e; --cv-glass-fill:rgba(76,175,114,.18); --cv-glass-stroke:#7fd8a0; --cv-mirror:#7fd8a0;
     --cv-ray:#5cc98a;
   }
   html[data-theme="light"]{
     --bg:#f7f9fb; --panel:#ffffff; --panel2:#f0f4f8; --line:#dde5ee;
-    --ink:#12222f; --dim:#5f7183; --accent:#1e8a4c; --accent2:#2fa968;
-    --warn:#b06d16; --ok:#2c8049; --shadow:0 1px 3px rgba(16,40,64,.08);
+    --ink:#12222f; --dim:#5f7183; --accent:#1e8a4c; --accent2:#2fa968; --mir-ink:#ffffff;
+    --stop:#6b3fbf; --cv-stop:#6b3fbf;
+    --warn:#b06d16; --ok:#0f8a86; --shadow:0 1px 3px rgba(16,40,64,.08);
     --cv-axis:#b6c3d1; --cv-glass-fill:rgba(30,138,76,.14); --cv-glass-stroke:#2fa968; --cv-mirror:#2fa968;
     --cv-ray:#1e8a4c;
   }
@@ -117,18 +119,26 @@
   .fw-unit{margin:7px 0 0;color:var(--dim);font-size:11.5px;opacity:.8}
   td.num{font-family:var(--mono);text-align:right;font-size:12.5px}
   tbody tr:last-child td{border-bottom:0}
-  tr.stop td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+  tr.stop td{background:color-mix(in srgb,var(--stop) 11%,transparent)}
   tr.mirror td{background:color-mix(in srgb,var(--accent2) 9%,transparent)}
   .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:10.5px;
     font-weight:650;background:var(--line);color:var(--ink);letter-spacing:.3px}
-  .tag.stop{background:var(--accent);color:#fff}
-  .tag.mir{background:var(--accent2);color:#fff}
+  .tag.stop{background:var(--stop);color:#fff}
+  .tag.mir{background:var(--accent2);color:var(--mir-ink)}
 
   /* ---------- cards ---------- */
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
   .kv{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
   .kv .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .kv .v{font-size:clamp(15px,3vw,18px);font-family:var(--mono);margin-top:4px;word-break:break-word}
+
+  /* aspheric coefficient chips */
+  td.coefs{white-space:normal;min-width:210px;line-height:1.5}
+  .coef{display:inline-block;font-family:var(--mono);font-size:11px;
+    color:var(--ink);background:var(--panel2);border:1px solid var(--line);
+    border-radius:4px;padding:1px 6px;margin:1px 4px 1px 0;white-space:nowrap}
+  .coef i{color:var(--dim);font-style:normal;margin-right:5px}
+  .coef-none{color:var(--dim)}
 
   .note{border-left:3px solid var(--warn);padding:11px 14px;border-radius:0 8px 8px 0;
     font-size:13.5px;margin-top:12px;line-height:1.6;
@@ -290,6 +300,10 @@ const TYPEDESC = {
   DGRATING:'Diffraction grating',
   BINARY_2:'Binary optic 2',
   ZERNSTAN:'Zernike standard sag',
+  OFFAXISCF:'Off-axis conic freeform',
+  XPOLYNOM:'Extended polynomial',
+  BICONICX:'Biconic',
+
   IRREGULA:'Irregular surface',
 };
 
@@ -326,7 +340,7 @@ function parseZMX(text){
     if(key==='SURF' && !indented){
       cur = {n:parseInt(rest,10), type:'STANDARD', curv:0, conic:0, thick:0,
              glass:null, glassRaw:null, semidia:null, comment:'', stop:false,
-             mirror:false, params:{}, flags:{}, ignored:false};
+             mirror:false, params:{}, xdat:{}, flags:{}, ignored:false};
       doc.surfaces.push(cur);
       continue;
     }
@@ -358,6 +372,15 @@ function parseZMX(text){
         case 'COMM': cur.comment = rest.replace(/^"|"$/g,''); break;
         case 'STOP': cur.stop = true; break;
         case 'MIRR': cur.flags.MIRR = rest; break;
+        case 'XDAT': {
+          // Extended surface types (freeforms, polynomials, Zernikes) store
+          // their coefficients here rather than in the 8 PARM slots.
+          // Format: XDAT <index> <value> [solve fields...]
+          const x = rest.split(/\s+/);
+          const idx = parseInt(x[0],10);
+          if(isFinite(idx)) cur.xdat[idx] = num(x[1]);
+          break;
+        }
         case 'PARM': {
           const p = rest.split(/\s+/);
           cur.params[parseInt(p[0],10)] = num(p[1]);
@@ -512,6 +535,103 @@ function paraxial(doc){
 
 /* ---------- rendering ---------- */
 const el = (h)=>{const d=document.createElement('div'); d.innerHTML=h.trim(); return d.firstChild;};
+/* ---------- aspheric / parameter display ---------- */
+// Coefficients are often ~1e-17, which fmt() would round to "0".
+const fmtCoef = (v)=>{
+  if(v===null||v===undefined||!isFinite(v)) return '—';
+  if(v===0) return '0';
+  const a=Math.abs(v);
+  return (a<1e-3||a>=1e6)? v.toExponential(5) : String(parseFloat(v.toPrecision(8)));
+};
+const SUP={1:'\u00b9',2:'\u00b2',3:'\u00b3',4:'\u2074',5:'\u2075',6:'\u2076',
+           7:'\u2077',8:'\u2078',9:'\u2079',0:'\u2070'};
+const supNum = n => String(n).split('').map(c=>SUP[+c]).join('');
+const SUB={1:'\u2081',2:'\u2082',3:'\u2083',4:'\u2084',5:'\u2085',
+           6:'\u2086',7:'\u2087',8:'\u2088'};
+
+// Only types whose PARM->coefficient mapping is unambiguous get powered labels.
+// Everything else falls back to a neutral "P<n>" so nothing is mislabelled.
+const POLY_TYPES = {
+  EVENASPH:  {step:2, start:2, max:8},   // alpha_i on r^2, r^4 ... r^16
+  ODDASPHE:  {step:1, start:1, max:8},   // alpha_i on r^1, r^2 ... r^8
+};
+function paramLabel(type, i){
+  const m = POLY_TYPES[type];
+  if(!m || i>m.max) return 'P'+i;
+  const power = m.start + (i-1)*m.step;
+  return '\u03b1'+(SUB[i]||i)+'\u2009r'+supNum(power);
+}
+/* ---------- XY polynomial term naming ----------
+   Terms run in increasing total degree; within a degree, powers of x descend:
+     x, y, x^2, xy, y^2, x^3, x^2 y, x y^2, y^3, ...
+   xyTerm(1) -> [1,0] (x),  xyTerm(2) -> [0,1] (y),  xyTerm(3) -> [2,0] (x^2), ...
+*/
+function xyTerm(n){
+  let i = n;
+  for(let d=1; ; d++){
+    const inDeg = d+1;                 // terms of total degree d
+    if(i <= inDeg) return [d-(i-1), i-1];   // x^(d-k) y^k
+    i -= inDeg;
+  }
+}
+function xyLabel(n){
+  const [px,py] = xyTerm(n);
+  const part = (v,e)=> e===0? '' : (e===1? v : v+supNum(e));
+  return (part('x',px)+part('y',py)) || '1';
+}
+
+/* Off-axis conic freeform: first three extra-data slots are configuration,
+   slot 4 onward are the XY polynomial coefficients. Mapping supplied by the
+   surface's Extra Data editor. */
+const XDAT_SCHEMAS = {
+  OFFAXISCF: {
+    fixed: {1:'Offset', 2:'Max terms', 3:'Norm radius'},
+    polyFrom: 4,
+    countSlot: 2        // slot holding the active term count
+  }
+};
+
+function xdatChips(s, chip){
+  const out = [];
+  const xd = s.xdat || {};
+  const keys = Object.keys(xd).map(Number).sort((a,b)=>a-b);
+  if(!keys.length) return out;
+  const sch = XDAT_SCHEMAS[s.type];
+
+  if(!sch){
+    // Unknown extended type: neutral labels, non-zero only.
+    keys.filter(k=>isFinite(xd[k]) && xd[k]!==0)
+        .forEach(k=> out.push(chip('X'+k, xd[k])));
+    return out;
+  }
+
+  // Configuration slots always shown - a zero offset is meaningful information.
+  Object.keys(sch.fixed).map(Number).sort((a,b)=>a-b).forEach(k=>{
+    if(k in xd) out.push(chip(sch.fixed[k], xd[k]));
+  });
+
+  const maxTerms = sch.countSlot!=null ? Number(xd[sch.countSlot]) : null;
+  keys.filter(k=> k>=sch.polyFrom && isFinite(xd[k]) && xd[k]!==0).forEach(k=>{
+    const n = k - sch.polyFrom + 1;            // 1-based polynomial term index
+    const beyond = (maxTerms && n>maxTerms);   // stored but inactive in OpticStudio
+    out.push(chip(xyLabel(n) + (beyond? ' \u26a0':''), xd[k]));
+  });
+  return out;
+}
+
+function paramCell(s){
+  if(!s.params) return '';
+  if(s.type==='COORDBRK') return '';        // shown as decenter/tilt in Notes
+  const nz = (obj)=>Object.keys(obj||{}).map(Number).sort((a,b)=>a-b)
+                 .filter(k=>{const v=obj[k]; return isFinite(v) && v!==0;});
+  const chip = (label,v)=>
+    `<span class="coef"><i>${label}</i>${fmtCoef(v)}</span>`;
+  const out = [];
+  nz(s.params).forEach(k=> out.push(chip(paramLabel(s.type,k), s.params[k])));
+  xdatChips(s, chip).forEach(c=> out.push(c));
+  return out.join('');
+}
+
 const fmt = (v,d=4)=> v===null||v===undefined?'—':(isFinite(v)? (Math.abs(v)>=1e5? v.toExponential(3): v.toFixed(d).replace(/\.?0+$/,'')) : (v===Infinity?'∞':'—'));
 
 function render(doc, filename){
@@ -568,7 +688,7 @@ function render(doc, filename){
       ? `<b>Consistent.</b> Paraxial back focal distance (${fmt(px.bfd,2)} ${doc.unit}) matches the stored image distance (${fmt(px.storedImageDist,2)} ${doc.unit}). Collimated input focuses at the image plane.`
       : `<b>Check needed.</b> Paraxial back focus computes to ${fmt(px.bfd,2)} ${doc.unit}, but the file stores ${fmt(px.storedImageDist,2)} ${doc.unit} to the image plane. This usually means the design uses model glasses, index solves, or pickups that this parser does not resolve — not necessarily a bad design.`;
     out.appendChild(el(`<section><h2>Paraxial consistency</h2><div class="body">
-      <div class="note" style="border-left-color:${ok?'var(--ok)':'var(--warn)'};background:${ok?'rgba(92,184,122,.1)':'rgba(224,164,88,.1)'}">${msg}</div>
+      <div class="note" style="border-left-color:${ok?'var(--ok)':'var(--warn)'};background:${ok?'color-mix(in srgb,var(--ok) 10%,transparent)':'color-mix(in srgb,var(--warn) 10%,transparent)'}">${msg}</div>
       </div></section>`));
   } else if(px && px.skip){
     const why=[];
@@ -614,13 +734,14 @@ function render(doc, filename){
       <td>${glassCell}</td>
       <td class="num">${fmt(s.semidia,3)}</td>
       <td class="num">${s.conic?fmt(s.conic,4):'0'}</td>
+      <td class="coefs">${paramCell(s)||'<span class="coef-none">—</span>'}</td>
       <td style="font-size:12px;color:var(--dim)">${note}</td>
     </tr>`;
   });
   tSec.querySelector('.scroller').innerHTML =
     `<table><thead><tr>
       <th>#</th><th>Type</th><th class="num">Radius</th><th class="num">Thickness</th>
-      <th>Glass</th><th class="num">Semi-Ø</th><th class="num">Conic</th><th>Notes</th>
+      <th>Glass</th><th class="num">Semi-Ø</th><th class="num">Conic</th><th class="nocaps">Coefficients</th><th>Notes</th>
     </tr></thead><tbody>${rows}</tbody></table>`;
   out.appendChild(tSec);
 
@@ -721,7 +842,8 @@ function drawLayout(doc, px, cv){
   const W=cssW, H=cssH;
   const C_AXIS=cssv('--cv-axis','#3a4753'), C_GLASS_F=cssv('--cv-glass-fill','rgba(74,163,223,.18)'),
         C_GLASS_S=cssv('--cv-glass-stroke','#8fc4e8'), C_MIR=cssv('--cv-mirror','#b48ce8'),
-        C_INK=cssv('--ink','#e6edf3'), C_DIM=cssv('--dim','#8b98a5');
+        C_INK=cssv('--ink','#e6edf3'), C_DIM=cssv('--dim','#8b98a5'),
+        C_STOP=cssv('--cv-stop','#a781e8');
   ctx.clearRect(0,0,W,H);
   const S = doc.surfaces;
   const inner = S.slice(1, S.length-1).filter(s=>s.type!=='COORDBRK');
@@ -789,12 +911,12 @@ function drawLayout(doc, px, cv){
     }
     // stop
     if(s.stop && !s.mirror){
-      ctx.strokeStyle=C_INK; ctx.lineWidth=3;
+      ctx.strokeStyle=C_STOP; ctx.lineWidth=3;
       ctx.beginPath();
       ctx.moveTo(X(pos[i]),Y(semi)); ctx.lineTo(X(pos[i]),Y(semi*1.35));
       ctx.moveTo(X(pos[i]),Y(-semi)); ctx.lineTo(X(pos[i]),Y(-semi*1.35));
       ctx.stroke();
-      ctx.fillStyle=C_DIM; ctx.font='12px sans-serif'; ctx.textAlign='center';
+      ctx.fillStyle=C_STOP; ctx.font='12px sans-serif'; ctx.textAlign='center';
       ctx.fillText('STOP', X(pos[i]), Y(semi*1.45));
     }
   }
@@ -864,7 +986,7 @@ function downloadJSON(doc,px,fn){
       type:s.type,radius:(s.curv&&Math.abs(s.curv)>1e-12)?1/s.curv:null,
       curvature:s.curv,thickness:s.thick===Infinity?'Infinity':s.thick,
       glass:s.mirror?'MIRROR':s.glass,semiDiameter:s.semidia,conic:s.conic,
-      stop:s.stop,comment:s.comment,parameters:s.params}))};
+      stop:s.stop,comment:s.comment,parameters:s.params,extraData:s.xdat}))};
   saveBlob(JSON.stringify(o,null,2),'application/json',
     (fn||'lens').replace(/\.[^.]+$/,'')+'.json');
 }
