@@ -13,20 +13,20 @@
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
   }
   html[data-theme="dark"]{
-    --bg:#000000; --panel:#1d1d1f; --panel2:#2c2c2e; --line:#38383a;
-    --ink:#f5f5f7; --dim:#98989d; --accent:#30d158; --accent2:#30d158; --mir-ink:#00250c;
-    --stop:#bf5af2; --cv-stop:#bf5af2;
-    --warn:#ff9f0a; --ok:#40c8e0; --shadow:0 4px 24px rgba(0,0,0,.5);
-    --cv-axis:#48484a; --cv-glass-fill:rgba(48,209,88,.14); --cv-glass-stroke:#6ee08c; --cv-mirror:#30d158;
-    --cv-ray:#30d158;
+    --bg:#0d1117; --panel:#151b23; --panel2:#1b222c; --line:#28313c;
+    --ink:#e8eef5; --dim:#8d99a6; --accent:#4caf72; --accent2:#7fd8a0; --mir-ink:#0f2418;
+    --stop:#8a5fd8; --cv-stop:#a781e8;
+    --warn:#e0a458; --ok:#3fb8ae; --shadow:0 1px 3px rgba(0,0,0,.4);
+    --cv-axis:#37424e; --cv-glass-fill:rgba(76,175,114,.18); --cv-glass-stroke:#7fd8a0; --cv-mirror:#7fd8a0;
+    --cv-ray:#5cc98a;
   }
   html[data-theme="light"]{
-    --bg:#ffffff; --panel:#f5f5f7; --panel2:#ffffff; --line:#d2d2d7;
-    --ink:#1d1d1f; --dim:#6e6e73; --accent:#248a3d; --accent2:#248a3d; --mir-ink:#ffffff;
-    --stop:#8944ab; --cv-stop:#8944ab;
-    --warn:#b25000; --ok:#0a7e8c; --shadow:0 4px 20px rgba(0,0,0,.06);
-    --cv-axis:#c7c7cc; --cv-glass-fill:rgba(36,138,61,.11); --cv-glass-stroke:#248a3d; --cv-mirror:#248a3d;
-    --cv-ray:#248a3d;
+    --bg:#f7f9fb; --panel:#ffffff; --panel2:#f0f4f8; --line:#dde5ee;
+    --ink:#12222f; --dim:#5f7183; --accent:#1e8a4c; --accent2:#2fa968; --mir-ink:#ffffff;
+    --stop:#6b3fbf; --cv-stop:#6b3fbf;
+    --warn:#b06d16; --ok:#0f8a86; --shadow:0 1px 3px rgba(16,40,64,.08);
+    --cv-axis:#b6c3d1; --cv-glass-fill:rgba(30,138,76,.14); --cv-glass-stroke:#2fa968; --cv-mirror:#2fa968;
+    --cv-ray:#1e8a4c;
   }
   *{box-sizing:border-box}
   html,body{max-width:100%;overflow-x:hidden}
@@ -125,6 +125,10 @@
     font-weight:650;background:var(--line);color:var(--ink);letter-spacing:.3px}
   .tag.stop{background:var(--stop);color:#fff}
   .tag.mir{background:var(--accent2);color:var(--mir-ink)}
+  /* model glass: neutral tag, since it isn't a catalog material */
+  .tag.model{background:transparent;border:1px solid var(--line);color:var(--dim)}
+  .gmodel{color:var(--dim);font-size:11.5px;font-family:var(--mono);white-space:nowrap}
+  .gmodel sub{font-size:9px}
 
   /* ---------- cards ---------- */
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -179,116 +183,6 @@
     .grid{grid-template-columns:1fr 1fr}
   }
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-
-  /* ==========================================================
-     APPLE EDITION — large type, generous space, soft geometry
-     ========================================================== */
-  :root{
-    --r:18px;
-    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",
-           "Helvetica Neue",Helvetica,Inter,sans-serif;
-  }
-  body{font-size:17px;line-height:1.55;letter-spacing:-.01em;
-    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-
-  /* ---------- nav: thin, translucent, quiet ---------- */
-  .bar{padding:0 clamp(18px,5vw,32px);min-height:52px;border-bottom:1px solid var(--line);
-    background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:saturate(180%) blur(20px)}
-  .brand{font-size:19px;font-weight:600;letter-spacing:-.02em}
-
-  /* segmented control, iOS style */
-  .toggle{background:var(--panel);border:0;border-radius:99px;padding:2px;gap:2px}
-  .toggle button{border-radius:99px;min-height:28px;min-width:38px;transition:.2s}
-  .toggle button.on{background:var(--panel2);color:var(--ink);
-    box-shadow:0 1px 3px rgba(0,0,0,.12)}
-  html[data-theme="dark"] .toggle button.on{background:#48484a;color:#fff}
-
-  /* ---------- hero: the headline moment ---------- */
-  .hero{padding:clamp(56px,11vw,116px) clamp(20px,5vw,24px) clamp(28px,5vw,44px)}
-  h1{font-size:clamp(40px,8.5vw,80px);font-weight:600;letter-spacing:-.035em;
-    line-height:1.05;margin:0 0 20px}
-  .tagline{font-size:clamp(19px,3.2vw,25px);line-height:1.4;letter-spacing:-.02em;
-    max-width:640px;color:var(--dim);font-weight:400}
-
-  .wrap{max-width:980px;padding:0 clamp(18px,5vw,24px) 90px}
-
-  /* ---------- dropzone: one big friendly card ---------- */
-  #drop{border:0;border-radius:22px;background:var(--panel);
-    padding:clamp(40px,8vw,68px) clamp(20px,4vw,28px);
-    transition:transform .25s cubic-bezier(.25,.1,.25,1),background .2s}
-  #drop:hover{background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
-  #drop.hot{transform:scale(1.012);background:color-mix(in srgb,var(--accent) 9%,var(--panel))}
-  .dz-icon{width:46px;height:46px;margin-bottom:18px;stroke-width:1.4}
-  .dz-main{font-size:clamp(20px,3.4vw,26px);font-weight:600;letter-spacing:-.02em}
-  .dz-main span{color:var(--accent)}
-  .dz-sub{font-size:15px;margin-top:10px}
-  .dz-badge{margin-top:20px;border:0;background:color-mix(in srgb,var(--ink) 7%,transparent);
-    font-size:13px;padding:6px 14px;letter-spacing:0}
-
-  /* ---------- notices ---------- */
-  .caution,.privacy{border-radius:18px;border:0;padding:20px 22px;gap:14px;
-    background:var(--panel)}
-  .caution p,.privacy p{font-size:15.5px;line-height:1.55}
-  .caution svg,.privacy svg{width:22px;height:22px}
-  .privacy .fine{font-size:14px;display:block;margin-top:8px}
-
-  /* ---------- cards & sections ---------- */
-  section{border-radius:18px;border:0;background:var(--panel);
-    margin-top:22px;box-shadow:none}
-  section>h2{background:transparent;border-bottom:1px solid var(--line);
-    text-transform:none;font-size:15px;font-weight:600;letter-spacing:-.01em;
-    color:var(--ink);padding:18px clamp(18px,3vw,24px)}
-  .body{padding:clamp(18px,3vw,24px)}
-
-  /* ---------- tables: airy, no cage ---------- */
-  table{font-size:15px}
-  th{text-transform:none;font-size:13px;font-weight:500;letter-spacing:0;
-    color:var(--dim);border-bottom:1px solid var(--line)}
-  th.nocaps{font-size:13px;letter-spacing:0}
-  td{border-bottom:1px solid color-mix(in srgb,var(--line) 45%,transparent);
-    padding:12px 12px}
-  th{padding:10px 12px}
-  td.num{font-size:14.5px;font-variant-numeric:tabular-nums}
-  .tag{border-radius:99px;font-size:11.5px;font-weight:600;letter-spacing:.01em;
-    padding:3px 10px;text-transform:none}
-  .coef{border-radius:8px;border:0;font-size:12.5px;padding:3px 9px;
-    background:color-mix(in srgb,var(--ink) 6%,transparent)}
-  .fw-cap{font-size:15.5px}
-
-  /* ---------- stat cards ---------- */
-  .grid{gap:14px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-  .kv{border-radius:14px;border:0;background:var(--panel2);padding:16px 18px;
-    box-shadow:var(--shadow)}
-  html[data-theme="dark"] .kv{background:var(--panel2);box-shadow:none}
-  .kv .k{text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--dim)}
-  .kv .v{font-size:clamp(21px,3.4vw,26px);font-weight:500;letter-spacing:-.02em;
-    font-family:var(--sans);font-variant-numeric:tabular-nums;margin-top:6px}
-
-  /* uniform tint, no left bar */
-  .note{border:0;border-radius:14px;font-size:15.5px;padding:16px 18px;
-    background:color-mix(in srgb,var(--warn) 10%,transparent)}
-  .note b{color:var(--warn);font-weight:600}
-  .note.ok{background:color-mix(in srgb,var(--ok) 10%,transparent)}
-  .note.ok b{color:var(--ok)}
-
-  canvas{border-radius:16px;border:0;background:var(--panel2)}
-  html[data-theme="dark"] canvas{background:#141416}
-  pre{border-radius:14px;border:0;font-size:12.5px;padding:16px}
-
-  /* ---------- pill buttons ---------- */
-  .btn{border-radius:99px;border:0;background:color-mix(in srgb,var(--ink) 8%,transparent);
-    font-size:15px;font-weight:500;letter-spacing:-.01em;padding:10px 20px;min-height:42px;
-    transition:.2s}
-  .btn:hover{background:var(--accent);color:#fff}
-  .btn:disabled:hover{background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--ink)}
-  .btn.btn-off{color:var(--dim)}
-  .cv-hint{font-size:14px}
-
-  footer{font-size:14px;letter-spacing:-.01em;padding:34px 20px 46px;line-height:1.8}
-
-  @media(max-width:720px){
-    .btn{width:auto}
-  }
 </style>
 </head>
 <body>
@@ -471,10 +365,14 @@ function parseZMX(text){
           const p = rest.split(/\s+/);
           cur.glass = p[0];
           // GLAS <name> <code> <flag> <n_d> <V_d> <dPgF> ...
-          cur.glassModelN = num(p[3]);
-          cur.glassModelV = num(p[4]);
+          cur.glassModelN   = num(p[3]);
+          cur.glassModelV   = num(p[4]);
+          cur.glassModelPgF = num(p[5]);
           cur.glassCode   = p[1];
           cur.glassFlag   = p[2];
+          // "___BLANK" is OpticStudio's placeholder for a model glass: it has no
+          // catalog entry, and is defined entirely by n_d / V_d / dPgF.
+          cur.modelGlass = /^_*BLANK_*$/i.test(p[0]);
           if(/^MIRROR$/i.test(p[0])) cur.mirror = true;
           break;
         }
@@ -798,7 +696,7 @@ function render(doc, filename){
       ? `<b>Consistent.</b> Paraxial back focal distance (${fmt(px.bfd,2)} ${doc.unit}) matches the stored image distance (${fmt(px.storedImageDist,2)} ${doc.unit}). Collimated input focuses at the image plane.`
       : `<b>Check needed.</b> Paraxial back focus computes to ${fmt(px.bfd,2)} ${doc.unit}, but the file stores ${fmt(px.storedImageDist,2)} ${doc.unit} to the image plane. This usually means the design uses model glasses, index solves, or pickups that this parser does not resolve — not necessarily a bad design.`;
     out.appendChild(el(`<section><h2>Paraxial consistency</h2><div class="body">
-      <div class="note ${ok?'ok':'warn'}">${msg}</div>
+      <div class="note" style="border-left-color:${ok?'var(--ok)':'var(--warn)'};background:${ok?'color-mix(in srgb,var(--ok) 10%,transparent)':'color-mix(in srgb,var(--warn) 10%,transparent)'}">${msg}</div>
       </div></section>`));
   } else if(px && px.skip){
     const why=[];
@@ -821,6 +719,14 @@ function render(doc, filename){
     const cls = s.stop?'stop':(s.mirror?'mirror':'');
     let glassCell = '—';
     if(s.mirror) glassCell = '<span class="tag mir">MIRROR</span>';
+    else if(s.modelGlass){
+      // no catalog entry to look up - show the three values that define it
+      glassCell = '<span class="tag model">MODEL GLASS</span> <span class="gmodel">'
+        + `n<sub>d</sub> ${fmt(s.glassModelN,4)}`
+        + ` \u00b7 V<sub>d</sub> ${fmt(s.glassModelV,4)}`
+        + ` \u00b7 \u0394P<sub>g,F</sub> ${fmt(s.glassModelPgF,4)}`
+        + '</span>';
+    }
     else if(s.glass){
       const n = sellmeierN(s.glass, primaryWave(doc));
       glassCell = s.glass + (n? ` <span style="color:var(--dim);font-size:11px">n=${n.toFixed(4)}</span>`:'');
@@ -1076,12 +982,16 @@ function drawLayout(doc, px, cv){
 
 /* ---------- exports ---------- */
 function downloadCSV(doc, fn){
-  const rows=[['Surface','Type','Radius','Thickness','Glass','SemiDiameter','Conic','Comment','Stop']];
+  const rows=[['Surface','Type','Radius','Thickness','Glass','Model nd','Model Vd','Model dPgF',
+               'SemiDiameter','Conic','Comment','Stop']];
   doc.surfaces.forEach((s,i)=>{
     const label = i===0?'OBJ':(i===doc.surfaces.length-1?'IMG':s.n);
     const R=(s.curv&&Math.abs(s.curv)>1e-12)?(1/s.curv):'Infinity';
     rows.push([label,s.type,R,(s.thick===Infinity?'Infinity':s.thick),
-      s.mirror?'MIRROR':(s.glass||''),s.semidia??'',s.conic??0,s.comment||'',s.stop?'YES':'']);
+      s.mirror?'MIRROR':(s.modelGlass?'MODEL':(s.glass||'')),
+      s.modelGlass?(s.glassModelN??''):'', s.modelGlass?(s.glassModelV??''):'',
+      s.modelGlass?(s.glassModelPgF??''):'',
+      s.semidia??'',s.conic??0,s.comment||'',s.stop?'YES':'']);
   });
   const csv=rows.map(r=>r.map(v=>`"${String(v)}"`).join(',')).join('\n');
   saveBlob(csv,'text/csv',(fn||'prescription').replace(/\.[^.]+$/,'')+'_prescription.csv');
@@ -1095,7 +1005,9 @@ function downloadJSON(doc,px,fn){
       index:i,label:i===0?'OBJ':(i===doc.surfaces.length-1?'IMG':s.n),
       type:s.type,radius:(s.curv&&Math.abs(s.curv)>1e-12)?1/s.curv:null,
       curvature:s.curv,thickness:s.thick===Infinity?'Infinity':s.thick,
-      glass:s.mirror?'MIRROR':s.glass,semiDiameter:s.semidia,conic:s.conic,
+      glass:s.mirror?'MIRROR':s.glass,
+      modelGlass: s.modelGlass? {nd:s.glassModelN, vd:s.glassModelV, dPgF:s.glassModelPgF} : null,
+      semiDiameter:s.semidia,conic:s.conic,
       stop:s.stop,comment:s.comment,parameters:s.params,extraData:s.xdat}))};
   saveBlob(JSON.stringify(o,null,2),'application/json',
     (fn||'lens').replace(/\.[^.]+$/,'')+'.json');
